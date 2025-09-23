@@ -32,8 +32,8 @@ def process(x, y, Z,
     window_coef_x = window_coef
     window_coef_y = window_coef
     X, Y = np.meshgrid(x, y)
-    n = len(x)
-    m = len(y)
+    m = len(x)
+    n = len(y)
     lx = np.ptp(x)
     ly = np.ptp(y)
     """
@@ -66,49 +66,28 @@ def process(x, y, Z,
     XY = np.column_stack((X[msk].ravel(), Y[msk].ravel()))
     clusters = KMeans(n_clusters=N_clusters, n_init='auto').fit_predict(XY)
     
+    cluster_list = list(set(clusters))
+    xms, yms = [], []
+    for c in cluster_list:
+        xy = XY[clusters==c]
+        xc, yc = xy[:, 0], xy[:, 1]
+        xms.append(xc.mean())
+        yms.append(yc.mean())
+    
+    ci1 = np.argmax(xms)
+    ci2 = np.argmax(yms)
+    if xms[ci1]/lx > yms[ci2]/ly:
+        ci0 = ci1
+    else:
+        ci0 = ci2
+    
+    c0 = clusters[ci0]
+    
     plt.subplot(323)
     plt.gca().set_aspect('equal')
     plt.scatter(XY[:, 0], XY[:, 1], c=clusters, s=1)
     plt.title('Selecting +1 peak')
-    flag = True
-    x1, x2 = 0, x.max()
-    y1, y2 = 0, y.max()
-    dx_m = 0.001*lx
-    dy_m = 0.001*ly
-    while flag and x1<x2 and y1<y2:
-        mask_x = (XY[:, 0] > x1)*(XY[:, 0] < x2)
-        mask_y = (XY[:, 1] > y1)*(XY[:, 1] < y2)
-        mask = mask_x*mask_y
-        if len(set(clusters[mask])) == 1:
-            flag = False
-        else:
-            x1+=dx_m
-            y1+=dy_m
-            
-    if x1==0 or y1==0:
-        x1, x2 = 0, x.max()
-        y1, y2 = y.min(), 0
-        flag = True
-        while flag and x1<x2 and y1<y2:
-            mask_x = (XY[:, 0] > x1)*(XY[:, 0] < x2)
-            mask_y = (XY[:, 1] > y1)*(XY[:, 1] < y2)
-            mask = mask_x*mask_y
-            if len(set(clusters[mask])) == 1:
-                flag = False
-            else:
-                x1+=dx_m
-                y2+=-dy_m
-                
-        if x1==0 or y2==0:
-            print('Error in detecting +1 peak!!!!!!!!!')
-            
-    c_s = list(set(clusters[mask]))
-    if len(c_s)>0:
-        c0 = c_s[0]
-    else:
-        c0 = 0
-        print('Peak +1 is not found!!!!!!\nThe random peak would be selected')
-    
+
     mask = (clusters==c0)
     xs = XY[:, 0][mask]
     ys = XY[:, 1][mask]
