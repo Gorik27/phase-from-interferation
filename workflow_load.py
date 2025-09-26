@@ -15,7 +15,7 @@ use_equal_windows = 1 # make a window a second time equal to the first
 
 processing_settings = { #The accuracy of the result greatly depends on the following parameters of processing and discharge +1 peak
 'mask_coef' : 0.75,     # The level of which is determined by peaks (all that is higher than mask_coef*maximum value)
-'window_coef' : 10,     # How much the window width is greater than the peak width of the mask_coef level 
+'window_coef' : 15,     # How much the window width is greater than the peak width of the mask_coef level 
 'freq_window' : 'hann'  # Choosing a filter window
                         # Options: 'no' - without a window
                         # 'hann' - Hann window
@@ -25,6 +25,9 @@ processing_settings = { #The accuracy of the result greatly depends on the follo
 }
 
 Z = np.loadtxt('data.txt')
+mask = (Z!=0)
+noize_scale = 0.0
+Z[mask] *= np.random.normal(loc=1, scale=noize_scale, size=Z.shape)[mask]
 n, m = Z.shape
 l = 1
 
@@ -34,25 +37,20 @@ y = np.linspace(-l/2, l/2, n)
 X, Y = np.meshgrid(x, y)
 
 
-phi1, phi1_u, dx, dy = process(x, y, Z, **processing_settings)
+S1, phi1_u, dx, dy = process(x, y, Z, **processing_settings)
 
 Z0 = np.loadtxt('data_reference.txt')
+mask0 = (Z0!=0)
+Z0[mask0] *= np.random.normal(loc=1, scale=noize_scale, size=Z.shape)[mask]
 
 if use_equal_windows:
-    phi0, phi0_u, _, _ = process(x, y, Z0, dx=dx, dy=dy, **processing_settings)
+    S0, phi0_u, _, _ = process(x, y, Z0, dx=dx, dy=dy, **processing_settings)
 else:
-    phi0, phi0_u, _, _ = process(x, y, Z0, **processing_settings)
+    S0, phi0_u, _, _ = process(x, y, Z0, **processing_settings)
 
 #%%
 dphi_u = phi1_u-phi0_u
-dphi = phi1-phi0
-
-plt_dphi_u = dphi_u
-
-plt.contourf(x, y, plt_dphi_u)
-plt.gca().set_aspect('equal')
-plt.colorbar()
-plt.title('Unwrapped phase  difference [rad/$\pi$]')
+dphi_u -= dphi_u.min()
 
 mn = dphi_u.mean()
 md = np.ma.median(dphi_u)
@@ -64,6 +62,23 @@ dphi_mn = phi2_mn - phi1_mn
 phi1_md = np.ma.median(dphi_u[dphi_u<md])
 phi2_md = np.ma.median(dphi_u[dphi_u>=md])
 dphi_md = phi2_md - phi1_md
+
+remove_spikes = 1
+if remove_spikes:
+    va, vb = np.ma.median(dphi_u[dphi_u<mn]), np.ma.median(dphi_u[dphi_u>=mn])
+    v1, v2 = min(va, vb)-1, max(va, vb)+1
+    pltmask = (dphi_u < v1) + (dphi_u > v2)
+    plt_dphi_u = np.ma.array(dphi_u, mask=pltmask)
+else:
+    plt_dphi_u = dphi_u
+
+#plt_dphi_u = dphi_u
+
+plt.contourf(x, y, plt_dphi_u)
+plt.gca().set_aspect('equal')
+plt.colorbar()
+plt.title('Unwrapped phase  difference [rad/$\pi$]')
+
 
 dphi_ptp = dphi_u.ptp()
 print(f'Median phase difference (splitted by median): {dphi_md} (2pi modulo: {np.mod(dphi_md, 2*np.pi)})')

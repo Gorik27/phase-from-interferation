@@ -1,6 +1,6 @@
 """
 This file contains the "Process" function, which takes a signal with the 
-interference to the input, and returns a phase map, a deployed phase, a window 
+interference to the input, and returns a filtered intensity map, a unwrapped phase map, a window 
 width containing +1 peaks in X and Y (the latter are needed if you need to make
 several measurements with the same window width)
 """
@@ -206,6 +206,7 @@ def process(x, y, Z,
     mask = np.ones_like(phi, dtype=bool)
     mask[mask2] = False
     phi = np.ma.array(phi, mask=mask)
+    Sp = np.ma.array(Sp, mask=mask)
     
     plt.subplot(325)
     plt.gca().set_aspect('equal')
@@ -226,4 +227,4 @@ def process(x, y, Z,
     
     plt.gcf().tight_layout()
     plt.show()
-    return phi, phi_u, dx, dy
+    return np.abs(Sp), phi_u, dx, dy

@@ -74,7 +74,7 @@ mask2 = (~mask1)*(X*X+Y*Y<R2*R2)
 Z[mask1] += 1+r1+2*np.sqrt(r1)*np.cos(rho1-k*(L[mask1]+2*dz))
 Z[mask2] += 1+r2+2*np.sqrt(r2)*np.cos(rho2-k*(L[mask2]+2*dz))
 
-phi1, phi1_u, dx, dy = process(x, y, Z, **processing_settings)
+S1, phi1_u, dx, dy = process(x, y, Z, **processing_settings)
 
 r1 = r1_i
 r2 = r1_i
@@ -91,15 +91,14 @@ Z[mask1] += 1+r1+2*np.sqrt(r1)*np.cos(rho1-k*(L[mask1]+2*dz))
 Z[mask2] += 1+r2+2*np.sqrt(r2)*np.cos(rho2-k*(L[mask2]+2*dz))
 
 if use_equal_windows:
-    phi0, phi0_u, _, _ = process(x, y, Z, dx=dx, dy=dy, **processing_settings)
+    S0, phi0_u, _, _ = process(x, y, Z, dx=dx, dy=dy, **processing_settings)
 else:
-    phi0, phi0_u, _, _ = process(x, y, Z, **processing_settings)
+    S0, phi0_u, _, _ = process(x, y, Z, **processing_settings)
 
 #%%
 #remove_skikes = True
 
 dphi_u = phi1_u-phi0_u
-dphi = phi1-phi0
 
 if remove_spikes:
     va, vb = np.ma.median(dphi_u[mask1]), np.ma.median(dphi_u[mask2])
