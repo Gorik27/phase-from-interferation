@@ -11,8 +11,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-name = 'groove.txt'
-name_reference = 'groove_reference.txt'
+name = 'data.txt'#'groove.txt'
+name_reference = 'data_reference.txt'#'groove_reference.txt'
 
 
 use_equal_windows = 1 # make a window a second time equal to the first
