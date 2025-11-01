@@ -4,7 +4,8 @@ interference to the input, and returns a filtered intensity map, a unwrapped pha
 width containing +1 peaks in X and Y (the latter are needed if you need to make
 several measurements with the same window width)
 """
-
+import os
+os.environ['OMP_NUM_THREADS'] = '1'
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.fft import fft2 as fft
@@ -14,6 +15,29 @@ from sklearn.cluster import KMeans
 from skimage.restoration import unwrap_phase
 from scipy.signal import windows
 
+def get_window(window_type, dn, dm, alpha=False):
+    if alpha:
+        wind_x = window_type(dm, alpha)
+        wind_y = window_type(dn, alpha)
+    else:
+        wind_x = window_type(dm)
+        wind_y = window_type(dn)
+    wind_2d = np.outer(wind_y, wind_x)
+    return wind_2d
+
+"""
+TODO: реализовать круглое окно w_2d(x, y) = w_1d(sqrt(x^2 + y^2))
+"""
+# def get_window(window_type, dn, dm, alpha=False):
+#     if alpha:
+#         wind_x = window_type(dm, alpha)
+#         wind_y = window_type(dn, alpha)
+#     else:
+#         wind_x = window_type(dm)
+#         wind_y = window_type(dn)
+#     wind_2d = np.outer(wind_y, wind_x)
+#     return wind_2d
+
 
 
 # The accuracy of the result greatly depends on the following parameters of processing and discharge +1 peak
@@ -22,6 +46,8 @@ def process(x, y, Z,
             dy=False,
             scale = 1, # multiplier to <desired units> from meters 
             language = 'en', # 'en' or 'ru'
+            plot = True,
+            verbose = True,
             N_clusters=3,   # The number of peaks in Fourier (normal 3)
             mask_coef=0.75, # The level of which is determined by peaks (all that is higher than mask_coef*maximum value)
             window_coef=10, # How much the window width is greater than the peak width of the mask_coef level 
@@ -63,17 +89,18 @@ def process(x, y, Z,
     """
     Plot signal
     """
-    plt.figure(dpi=500)
-    plt.subplot(321)
-    plt.gca().set_aspect('equal')
-    plt.contourf(x*scale, y*scale, Z)
-    plt.xlabel(f'[{units}]')
-    plt.ylabel(f'[{units}]')
-    plt.colorbar()
-    match language:
-        case 'en': title = 'Signal'
-        case 'ru': title = 'Сигнал'
-    plt.title(title)
+    if plot:
+        plt.figure(dpi=500)
+        plt.subplot(321)
+        plt.gca().set_aspect('equal')
+        plt.contourf(x*scale, y*scale, Z)
+        plt.xlabel(f'[{units}]')
+        plt.ylabel(f'[{units}]')
+        plt.colorbar()
+        match language:
+            case 'en': title = 'Signal'
+            case 'ru': title = 'Сигнал'
+        plt.title(title)
     mask2 = (Z!=0)
     
     """
@@ -83,16 +110,17 @@ def process(x, y, Z,
     F = fftshift(fft(Z))
     Fz = np.log(np.abs(F))
     msk = (Fz>mask_coef*Fz.max())
-    plt.subplot(322)
-    plt.gca().set_aspect('equal')
-    plt.xticks([])
-    plt.yticks([])
-    plt.contourf(x, y, Fz)
-    match language:
-        case 'en': title = 'Fourier'
-        case 'ru': title = 'Преобразование Фурье'
-    plt.title(title)
-    plt.colorbar()
+    if plot:
+        plt.subplot(322)
+        plt.gca().set_aspect('equal')
+        plt.xticks([])
+        plt.yticks([])
+        plt.contourf(x, y, Fz)
+        match language:
+            case 'en': title = 'Fourier'
+            case 'ru': title = 'Преобразование Фурье'
+        plt.title(title)
+        plt.colorbar()
     
     """
     Find window consisting +1 peak
@@ -117,13 +145,14 @@ def process(x, y, Z,
     
     c0 = clusters[ci0]
     
-    plt.subplot(323)
-    plt.gca().set_aspect('equal')
-    plt.scatter(XY[:, 0], XY[:, 1], c=clusters, s=1)
-    match language:
-        case 'en': title = 'Selecting +1 peak'
-        case 'ru': title = 'Выбор +1 пика'
-    plt.title(title)
+    if plot:
+        plt.subplot(323)
+        plt.gca().set_aspect('equal')
+        plt.scatter(XY[:, 0], XY[:, 1], c=clusters, s=1)
+        match language:
+            case 'en': title = 'Selecting +1 peak'
+            case 'ru': title = 'Выбор +1 пика'
+        plt.title(title)
 
     mask = (clusters==c0)
     xs = XY[:, 0][mask]
@@ -155,10 +184,11 @@ def process(x, y, Z,
     # x2 = xm+(x2-xm)*window_coef_x
     # y2 = ym+(y2-ym)*window_coef_y
     
-    plt.plot([x1, x1, x2, x2, x1], [y1, y2, y2, y1, y1], color='black', alpha=0.3)
-    plt.xticks([])
-    plt.yticks([])
-    plt.plot([xm], [ym], 'x', color='red')
+    if plot:
+        plt.plot([x1, x1, x2, x2, x1], [y1, y2, y2, y1, y1], color='black', alpha=0.3)
+        plt.xticks([])
+        plt.yticks([])
+        plt.plot([xm], [ym], 'x', color='red')
     
     """
     Inverse Fourier and phase calculation
@@ -176,50 +206,24 @@ def process(x, y, Z,
     dm = (j2-j1)
     m0 = (m-dm)//2
     
-    
-    def get_window(window_type, dn, dm, alpha=False):
-        if alpha:
-            wind_x = window_type(dm, alpha)
-            wind_y = window_type(dn, alpha)
-        else:
-            wind_x = window_type(dm)
-            wind_y = window_type(dn)
-        wind_2d = np.outer(wind_y, wind_x)
-        return wind_2d
-    
-    """
-    TODO: реализовать круглое окно w_2d(x, y) = w_1d(sqrt(x^2 + y^2))
-    """
-    # def get_window(window_type, dn, dm, alpha=False):
-    #     if alpha:
-    #         wind_x = window_type(dm, alpha)
-    #         wind_y = window_type(dn, alpha)
-    #     else:
-    #         wind_x = window_type(dm)
-    #         wind_y = window_type(dn)
-    #     wind_2d = np.outer(wind_y, wind_x)
-    #     return wind_2d
-        
-        
-    
     match freq_window:
         case 'hann':
-            print('Hann window is used')
+            if verbose: print('Hann window is used')
             window = get_window(windows.hann, dn, dm)
         case 'bh':
-            print('Blackman-Harris window is used')
+            if verbose: print('Blackman-Harris window is used')
             window = get_window(windows.blackmanharris, dn, dm)
         case 'cos':
-            print('Cosine window is used')
+            if verbose: print('Cosine window is used')
             window = get_window(windows.cosine, dn, dm)
         case 'tukey':
-            print('Tukey window is used')
+            if verbose: print('Tukey window is used')
             alpha = 0.5
             window = get_window(windows.tukey, dn, dm, alpha)
         case 'no':
             window = np.ones((dn, dm))
         case _:
-            print('Unkonwn window!!!\nNo window will be used!')
+            if verbose: print('Unkonwn window!!!\nNo window will be used!')
             window = np.ones((dn, dm))
     # plt.figure()
     # plt.contourf(window)
@@ -229,17 +233,17 @@ def process(x, y, Z,
     Fzp[n0:n0+dn, m0:m0+dm] = Fz[i1:i2, j1:j2]*window
     Fp[n0:n0+dn, m0:m0+dm] = F[i1:i2, j1:j2]*window
     
-    
-    plt.subplot(324)
-    plt.gca().set_aspect('equal')
-    plt.contourf(x[j1:j2], y[i1:i2], Fz[i1:i2, j1:j2]*window)
-    plt.xticks([])
-    plt.yticks([])
-    plt.colorbar()
-    match language:
-        case 'en': title = 'Centered and windowed +1 peak'
-        case 'ru': title = 'Обрезаный и центрированный +1 пик'
-    plt.title(title)
+    if plot:
+        plt.subplot(324)
+        plt.gca().set_aspect('equal')
+        plt.contourf(x[j1:j2], y[i1:i2], Fz[i1:i2, j1:j2]*window)
+        plt.xticks([])
+        plt.yticks([])
+        plt.colorbar()
+        match language:
+            case 'en': title = 'Centered and windowed +1 peak'
+            case 'ru': title = 'Обрезаный и центрированный +1 пик'
+        plt.title(title)
     
     
     Sp = ifft(Fp)
@@ -249,33 +253,34 @@ def process(x, y, Z,
     phi = np.ma.array(phi, mask=mask)
     Sp = np.ma.array(Sp, mask=mask)
     
-    plt.subplot(325)
-    plt.gca().set_aspect('equal')
-    plt.contourf(x*scale, y*scale, phi/(np.pi))
-    plt.xlabel(f'[{units}]')
-    plt.ylabel(f'[{units}]')
-    match language:
-        case 'en': title = 'Selecting +1 peak'
-        case 'ru': title = 'Выбор +1 пика'
-    plt.title(title)
-    plt.colorbar()
-    
+    if plot:
+        plt.subplot(325)
+        plt.gca().set_aspect('equal')
+        plt.contourf(x*scale, y*scale, phi/(np.pi))
+        plt.xlabel(f'[{units}]')
+        plt.ylabel(f'[{units}]')
+        match language:
+            case 'en': title = 'Selecting +1 peak'
+            case 'ru': title = 'Выбор +1 пика'
+        plt.title(title)
+        plt.colorbar()
+        
     
     phi_u = unwrap_phase(phi)
     
-    plt.subplot(326)
-    #np.mod(phi_u, 2*np.pi)
-    plt.contourf(x*scale, y*scale, phi_u/(np.pi))
-    plt.xlabel(f'[{units}]')
-    plt.ylabel(f'[{units}]')
-    plt.gca().set_aspect('equal')
-    plt.colorbar()
-    match language:
-        case 'en': title = 'Unwrapped phase [rad/$\pi$]'
-        case 'ru': title = 'Развернутая фаза [рад/$\pi$]'
-    plt.title(title)
-
-    
-    plt.gcf().tight_layout()
-    plt.show()
+    if plot:
+        plt.subplot(326)
+        #np.mod(phi_u, 2*np.pi)
+        plt.contourf(x*scale, y*scale, phi_u/(np.pi))
+        plt.xlabel(f'[{units}]')
+        plt.ylabel(f'[{units}]')
+        plt.gca().set_aspect('equal')
+        plt.colorbar()
+        match language:
+            case 'en': title = 'Unwrapped phase [rad/$\pi$]'
+            case 'ru': title = 'Развернутая фаза [рад/$\pi$]'
+        plt.title(title)
+        plt.gcf().tight_layout()
+        plt.show()
+        
     return np.abs(Sp), phi_u, dx, dy

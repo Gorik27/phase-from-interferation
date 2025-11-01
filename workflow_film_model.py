@@ -5,18 +5,19 @@ The file generates the interference model signal, and then processes it to
 measure the phase difference between area covered with film and area uncovered
 """
 from processing import process
-import os
-os.environ['OMP_NUM_THREADS'] = '1'
 import numpy as np
 import matplotlib.pyplot as plt
 
 
+plot_delta_rho = 0 # turn on plotting phase map
 remove_spikes = 1 #turn on stupid algorithm to remove spikes from final picture (sometimes may not work because it is stupid)
 use_equal_windows = 1 # make a window a second time equal to the first
 
 processing_settings = { #The accuracy of the result greatly depends on the following parameters of processing and discharge +1 peak
 'scale' : 1000,
 'language': 'ru',
+'plot': False,
+'verbose': False,
 'mask_coef' : 0.75,     # The level of which is determined by peaks (all that is higher than mask_coef*maximum value)
 'window_coef' : 10,     # How much the window width is greater than the peak width of the mask_coef level 
 'freq_window' : 'hann'  # Choosing a filter window
@@ -52,14 +53,17 @@ def r_rho(n, l, lmb, nv, ns):
 Material parameters
 """
 lmb = 670*1e-9 #nm
-
+k = 2*np.pi/lmb
 #B
 n_film = 3.25
 k_film = 0.3
 N_film = n_film - 1j*k_film
 
-#thickness = 100e-9 #nm # TODO: from 30 to 180 nm
-thickness = np.linspace(30, 180)*1e-9
+thickness_plt = np.linspace(0, 180, 1000)*1e-9
+#thickness_plt = np.concatenate(([0], thickness_plt))
+thickness = np.array([10, 25, 38, 50, 61, 75, 100, 130, 140, 150, 165, 180])*1e-9
+thickness = thickness_plt
+
 
 n_air = 1
 
@@ -74,22 +78,40 @@ n_sub = (n1*(lmb2-lmb) + n2*(lmb-lmb1))/(lmb2-lmb1) # linear interpolation
 k_sub = (k1*(lmb2-lmb) + k2*(lmb-lmb1))/(lmb2-lmb1) # linear interpolation
 N_sub = n_sub - 1j*k_sub
 
-rho = np.zeros(len(thickness))
+rho_plt = np.zeros(len(thickness_plt))
+rho_ex = np.zeros(len(thickness))
+
+_, rho0 = r_rho(N_film, 0, lmb, n_air, N_sub)
+for i, t in enumerate(thickness_plt):
+    _, rho_plt[i] = r_rho(N_film, t, lmb, n_air, N_sub)
+    rho_plt[i] -= 2*k*t+rho0
+    rho_plt[i] = np.mod(rho_plt[i], 2*np.pi)
+    if i>0:
+        if rho_plt[i]-rho_plt[i-1] < -np.pi*1.9:
+            rho_plt[i] += 2*np.pi
+        elif rho_plt[i]-rho_plt[i-1] > np.pi*1.9:
+            rho_plt[i] += -2*np.pi
+
 for i, t in enumerate(thickness):
-    _, rho[i] = r_rho(N_film, t, lmb, n_air, N_sub)
-    
+    _, rho_ex[i] = r_rho(N_film, t, lmb, n_air, N_sub)
+    rho_ex[i] -= 2*k*t+rho0
+    rho_ex[i] = np.mod(rho_ex[i], 2*np.pi)
+    if i>0:
+        if rho_ex[i]-rho_ex[i-1] < -np.pi*1.9:
+            rho_ex[i] += 2*np.pi
+        elif rho_ex[i]-rho_ex[i-1] > np.pi*1.9:
+            rho_ex[i] += -2*np.pi
+            
 plt.figure(dpi=500)
-plt.plot(thickness*1e9, rho)
+plt.plot(thickness_plt*1e9, rho_plt/(np.pi))
+plt.plot(thickness*1e9, rho_ex/(np.pi), 'o')
 plt.xlabel('B film thickness [nm]')
-plt.ylabel('phase')
-plt.plot()
+plt.ylabel('phase [$\pi$ rad]')
+plt.show()
 #%%
-"""
-#Signal generation 1
-"""
 scale = 1000 #mm
 
-N = 1000
+N = 1500
 n, m = N, N
 
 
@@ -104,40 +126,21 @@ X, Y = np.meshgrid(x, y)
 mask1 = (X*X+Y*Y<R1*R1)
 mask2 = (~mask1)*(X*X+Y*Y<R2*R2)
 
-#film_modulation = (1+0.2*np.cos(4*np.pi*X/l))[mask2]
-
-
-theta = 1*1e-3 #mrads - angle between interfering rays
+theta = 1.0*1e-3 #mrads - angle between interfering rays
 psi = np.pi*(1/4+1/8) # The angle between the plum of the fall of light and the axis x
 
 P = lmb/2/theta 
 p = l/n
 
 print(f'Period (P): {P*1e2} cm')
-print(f'Pixel size (p): {p*1e2} cm')
+print(f'Pixel size (p): {p*1e6} um')
 print(f'p < P/6? ----> {p<P/6}')
 
-k = 2*np.pi/lmb
 dz = 0#lmb*0.1
 
-L = np.sin(theta)*(np.cos(psi)*X + np.sin(psi)*Y)
-Z = np.zeros((n, m))
-
-r1, rho1 = r_rho(N_film, 0, lmb, n_air, N_sub)
-r2, rho2 = r_rho(N_film, thickness, lmb, n_air, N_sub)
-
-
-Z[mask1] += 1+r1+2*np.sqrt(r1)*np.cos(rho1-k*(L[mask1]+2*dz))
-Z[mask2] += 1+r2+2*np.sqrt(r2)*np.cos(rho2-k*(L[mask2]+2*dz))
 
 """
-#Processing 1
-"""
-
-S1, phi1_u, dx, dy = process(x, y, Z, **processing_settings)
-
-"""
-#Signal generation 2
+#Signal generation 0
 """
 r1, rho1 = r_rho(N_film, 0, lmb, n_air, N_sub)
 r2, rho2 = r_rho(N_film, 0, lmb, n_air, N_sub)
@@ -152,29 +155,10 @@ Z[mask1] += 1+r1+2*np.sqrt(r1)*np.cos(rho1-k*(L[mask1]+2*dz))
 Z[mask2] += 1+r2+2*np.sqrt(r2)*np.cos(rho2-k*(L[mask2]+2*dz))
 
 """
-#Processing 2
+#Processing 0
 """
 
-if use_equal_windows:
-    S0, phi0_u, _, _ = process(x, y, Z, dx=dx, dy=dy, **processing_settings)
-else:
-    S0, phi0_u, _, _ = process(x, y, Z, **processing_settings)
-
-#%%
-"""
-#Plotting
-"""
-#remove_skikes = True
-
-dphi_u = phi1_u-phi0_u
-
-if remove_spikes:
-    va, vb = np.ma.median(dphi_u[mask1]), np.ma.median(dphi_u[mask2])
-    v1, v2 = min(va, vb)-1, max(va, vb)+1
-    pltmask = (dphi_u < v1) + (dphi_u > v2)
-    plt_dphi_u = np.ma.array(dphi_u, mask=pltmask)
-else:
-    plt_dphi_u = dphi_u
+S0, phi0_u, dx, dy = process(x, y, Z, **processing_settings)
 
 units = 'a.u.'
 match scale:
@@ -184,15 +168,56 @@ match scale:
         units = 'см'
     case 1:
         units = 'м'
-plt.contourf(x, y, plt_dphi_u)
-plt.xlabel(f'[{units}]')
-plt.ylabel(f'[{units}]')
-plt.gca().set_aspect('equal')
-plt.colorbar()
-plt.title('Развернутая разность фаз [рад/$\pi$]')
+        
+r1, rho1 = r_rho(N_film, 0, lmb, n_air, N_sub)
+rho_calc = np.zeros(rho_ex.shape)    
 
-dphi_m = np.ma.median(dphi_u[mask1])-np.ma.median(dphi_u[mask2])
-dphi_m *= -1
-print(f'Median phase difference: {dphi_m} (2pi modulo: {np.mod(dphi_m, 2*np.pi)})')
-plt.gcf().tight_layout()
+for i, tk in enumerate(thickness):
+    print(f'Толщина: {tk*1e9}nm')
+    
+    r2, rho2 = r_rho(N_film, tk, lmb, n_air, N_sub)
+    
+    L = np.sin(theta)*(np.cos(psi)*X + np.sin(psi)*Y)
+    Z = np.zeros((n, m))
+    
+    Z[mask1] += 1+r1+2*np.sqrt(r1)*np.cos(rho1-k*(L[mask1]+2*dz))
+    Z[mask2] += 1+r2+2*np.sqrt(r2)*np.cos(rho2-k*(L[mask2]+2*(dz+tk)))
+    
+    if use_equal_windows:
+        S1, phi1_u, _, _ = process(x, y, Z, dx=dx, dy=dy, **processing_settings)
+    else:
+        S1, phi1_u, _, _ = process(x, y, Z, **processing_settings)
+    
+    dphi_u = phi1_u-phi0_u
+    
+    dphi_m = np.ma.median(dphi_u[mask2])-np.ma.median(dphi_u[mask1])
+    rho_calc[i] = np.mod(dphi_m, 2*np.pi)#dphi_m
+    print(f'Median phase difference 2pi modulo: {np.mod(dphi_m, 2*np.pi)}')
+    
+    if plot_delta_rho:
+        if remove_spikes:
+            va, vb = np.ma.median(dphi_u[mask1]), np.ma.median(dphi_u[mask2])
+            v1, v2 = min(va, vb)-1, max(va, vb)+1
+            pltmask = (dphi_u < v1) + (dphi_u > v2)
+            plt_dphi_u = np.ma.array(dphi_u, mask=pltmask)
+        else:
+            plt_dphi_u = dphi_u
+        
+        plt.contourf(x, y, plt_dphi_u)
+        plt.xlabel(f'[{units}]')
+        plt.ylabel(f'[{units}]')
+        plt.gca().set_aspect('equal')
+        plt.colorbar()
+        plt.title('Развернутая разность фаз [рад/$\pi$]')
+        plt.gcf().tight_layout()
+        plt.show()
+    
+#%%
+
+plt.figure(dpi=500)
+plt.plot(thickness_plt*1e9, rho_plt/(np.pi), label='Рассчет')
+plt.plot(thickness*1e9, rho_calc/(np.pi), '.', color='black', label='Измерение')
+plt.legend()
+plt.xlabel('Толщина пленки бора [нм]')
+plt.ylabel('Разность фаз [$\pi$ рад]')
 plt.show()

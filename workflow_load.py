@@ -5,8 +5,6 @@ The file generates the interference model signal, and then processes it to
 measure the phase difference between area covered with film and area uncovered
 """
 from processing import process
-import os
-os.environ['OMP_NUM_THREADS'] = '1'
 import numpy as np
 import matplotlib.pyplot as plt
 
