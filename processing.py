@@ -20,6 +20,8 @@ from scipy.signal import windows
 def process(x, y, Z, 
             dx=False,
             dy=False,
+            scale = 1, # multiplier to <desired units> from meters 
+            language = 'en', # 'en' or 'ru'
             N_clusters=3,   # The number of peaks in Fourier (normal 3)
             mask_coef=0.75, # The level of which is determined by peaks (all that is higher than mask_coef*maximum value)
             window_coef=10, # How much the window width is greater than the peak width of the mask_coef level 
@@ -36,15 +38,42 @@ def process(x, y, Z,
     n = len(y)
     lx = np.ptp(x)
     ly = np.ptp(y)
+    
+    if language=='ru':
+        units_mm = 'мм'
+        units_cm = 'см'
+        units_m = 'м'
+    elif language == 'en':
+        units_mm = 'mm'
+        units_cm = 'cm'
+        units_m = 'm'
+    else:
+        raise ValueError('language can be "en" or "ru" only!')    
+        
+    match scale:
+        case 1000:
+            units = units_mm
+        case 100:
+            units = units_cm
+        case 1:
+            units = units_m
+        case _:
+            print('WARNING: Can auto-define units only for 1000, 100, 1 scale')
+            units = 'a.u.'
     """
     Plot signal
     """
     plt.figure(dpi=500)
     plt.subplot(321)
     plt.gca().set_aspect('equal')
-    plt.contourf(x, y, Z)
+    plt.contourf(x*scale, y*scale, Z)
+    plt.xlabel(f'[{units}]')
+    plt.ylabel(f'[{units}]')
     plt.colorbar()
-    plt.title('Signal')
+    match language:
+        case 'en': title = 'Signal'
+        case 'ru': title = 'Сигнал'
+    plt.title(title)
     mask2 = (Z!=0)
     
     """
@@ -56,8 +85,13 @@ def process(x, y, Z,
     msk = (Fz>mask_coef*Fz.max())
     plt.subplot(322)
     plt.gca().set_aspect('equal')
+    plt.xticks([])
+    plt.yticks([])
     plt.contourf(x, y, Fz)
-    plt.title('Fourier')
+    match language:
+        case 'en': title = 'Fourier'
+        case 'ru': title = 'Преобразование Фурье'
+    plt.title(title)
     plt.colorbar()
     
     """
@@ -86,7 +120,10 @@ def process(x, y, Z,
     plt.subplot(323)
     plt.gca().set_aspect('equal')
     plt.scatter(XY[:, 0], XY[:, 1], c=clusters, s=1)
-    plt.title('Selecting +1 peak')
+    match language:
+        case 'en': title = 'Selecting +1 peak'
+        case 'ru': title = 'Выбор +1 пика'
+    plt.title(title)
 
     mask = (clusters==c0)
     xs = XY[:, 0][mask]
@@ -199,7 +236,11 @@ def process(x, y, Z,
     plt.xticks([])
     plt.yticks([])
     plt.colorbar()
-    plt.title('Centered and windowed +1 peak')
+    match language:
+        case 'en': title = 'Centered and windowed +1 peak'
+        case 'ru': title = 'Обрезаный и центрированный +1 пик'
+    plt.title(title)
+    
     
     Sp = ifft(Fp)
     phi = np.arctan2(np.imag(Sp), np.real(Sp))
@@ -210,8 +251,13 @@ def process(x, y, Z,
     
     plt.subplot(325)
     plt.gca().set_aspect('equal')
-    plt.contourf(x, y, phi/(np.pi))
-    plt.title('Phase [rad/$\pi$]')
+    plt.contourf(x*scale, y*scale, phi/(np.pi))
+    plt.xlabel(f'[{units}]')
+    plt.ylabel(f'[{units}]')
+    match language:
+        case 'en': title = 'Selecting +1 peak'
+        case 'ru': title = 'Выбор +1 пика'
+    plt.title(title)
     plt.colorbar()
     
     
@@ -219,10 +265,15 @@ def process(x, y, Z,
     
     plt.subplot(326)
     #np.mod(phi_u, 2*np.pi)
-    plt.contourf(x, y, phi_u/(np.pi))
+    plt.contourf(x*scale, y*scale, phi_u/(np.pi))
+    plt.xlabel(f'[{units}]')
+    plt.ylabel(f'[{units}]')
     plt.gca().set_aspect('equal')
     plt.colorbar()
-    plt.title('Unwrapped phase [rad/$\pi$]')
+    match language:
+        case 'en': title = 'Unwrapped phase [rad/$\pi$]'
+        case 'ru': title = 'Развернутая фаза [рад/$\pi$]'
+    plt.title(title)
 
     
     plt.gcf().tight_layout()
