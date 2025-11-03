@@ -9,14 +9,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-plot_delta_rho = 0 # turn on plotting phase map
+plot_delta_rho = 1 # turn on plotting phase map
 remove_spikes = 1 #turn on stupid algorithm to remove spikes from final picture (sometimes may not work because it is stupid)
 use_equal_windows = 1 # make a window a second time equal to the first
 
 processing_settings = { #The accuracy of the result greatly depends on the following parameters of processing and discharge +1 peak
 'scale' : 1000,
 'language': 'ru',
-'plot': False,
+'plot': 1,
 'verbose': False,
 'mask_coef' : 0.75,     # The level of which is determined by peaks (all that is higher than mask_coef*maximum value)
 'window_coef' : 10,     # How much the window width is greater than the peak width of the mask_coef level 
@@ -47,7 +47,7 @@ def r_rho(n, l, lmb, nv, ns):
     R = reflction(n, l, lmb, nv, ns)
     r = np.abs(R)
     rho = np.angle(R)
-    return r, rho
+    return r**2, rho
     
 """
 Material parameters
@@ -59,10 +59,11 @@ n_film = 3.25
 k_film = 0.3
 N_film = n_film - 1j*k_film
 
-thickness_plt = np.linspace(0, 180, 1000)*1e-9
+thickness_plt = np.linspace(0, 180, 100)*1e-9
 #thickness_plt = np.concatenate(([0], thickness_plt))
 thickness = np.array([10, 25, 38, 50, 61, 75, 100, 130, 140, 150, 165, 180])*1e-9
-thickness = thickness_plt
+#thickness = thickness_plt
+thickness = np.array([50])*1e-9
 
 
 n_air = 1
@@ -85,26 +86,20 @@ _, rho0 = r_rho(N_film, 0, lmb, n_air, N_sub)
 for i, t in enumerate(thickness_plt):
     _, rho_plt[i] = r_rho(N_film, t, lmb, n_air, N_sub)
     rho_plt[i] -= 2*k*t+rho0
-    rho_plt[i] = np.mod(rho_plt[i], 2*np.pi)
-    if i>0:
-        if rho_plt[i]-rho_plt[i-1] < -np.pi*1.9:
-            rho_plt[i] += 2*np.pi
-        elif rho_plt[i]-rho_plt[i-1] > np.pi*1.9:
-            rho_plt[i] += -2*np.pi
+    #rho_plt[i] = np.mod(rho_plt[i], 2*np.pi)
 
 for i, t in enumerate(thickness):
     _, rho_ex[i] = r_rho(N_film, t, lmb, n_air, N_sub)
     rho_ex[i] -= 2*k*t+rho0
-    rho_ex[i] = np.mod(rho_ex[i], 2*np.pi)
-    if i>0:
-        if rho_ex[i]-rho_ex[i-1] < -np.pi*1.9:
-            rho_ex[i] += 2*np.pi
-        elif rho_ex[i]-rho_ex[i-1] > np.pi*1.9:
-            rho_ex[i] += -2*np.pi
+    #rho_ex[i] = np.mod(rho_ex[i], 2*np.pi)
             
+rho_plt_ = np.unwrap(rho_plt)
+rho_ex_ = np.unwrap(rho_ex)
+kk = round((rho_ex_.mean()-rho_plt_.mean())/(2*np.pi))
+rho_ex_ -= 2*kk*np.pi
 plt.figure(dpi=500)
-plt.plot(thickness_plt*1e9, rho_plt/(np.pi))
-plt.plot(thickness*1e9, rho_ex/(np.pi), 'o')
+plt.plot(thickness_plt*1e9, rho_plt_/(np.pi))
+plt.plot(thickness*1e9, rho_ex_/(np.pi), 'o')
 plt.xlabel('B film thickness [nm]')
 plt.ylabel('phase [$\pi$ rad]')
 plt.show()
@@ -215,8 +210,13 @@ for i, tk in enumerate(thickness):
 #%%
 
 plt.figure(dpi=500)
-plt.plot(thickness_plt*1e9, rho_plt/(np.pi), label='Рассчет')
-plt.plot(thickness*1e9, rho_calc/(np.pi), '.', color='black', label='Измерение')
+rho_plt_ = np.unwrap(rho_plt)
+rho_calc_ = np.unwrap(rho_calc)
+kk = round((rho_calc_.mean()-rho_plt_.mean())/(2*np.pi))
+rho_calc_ -= 2*kk*np.pi
+
+plt.plot(thickness_plt*1e9, rho_plt_/(np.pi), label='Рассчет')
+plt.plot(thickness*1e9, rho_calc_/(np.pi), '.', color='black', label='Измерение')
 plt.legend()
 plt.xlabel('Толщина пленки бора [нм]')
 plt.ylabel('Разность фаз [$\pi$ рад]')

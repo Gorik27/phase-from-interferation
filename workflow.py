@@ -29,9 +29,9 @@ processing_settings = { #The accuracy of the result greatly depends on the follo
 #Signal generation 1
 """
 scale = 1000
-N = 1000
+N = 1600
 n, m = N, N
-lmb = 400*1e-9 #nm
+lmb = 670*1e-9 #nm
 
 l = 2*1e-2 #cm - The width of the screen
 R1 = 0.5 # radius of the film (center) in shares from L
@@ -73,7 +73,7 @@ r1 = r1_i
 r2 = r2_i#*film_modulation
 rho1 = 0
 #rho2 = drho_i
-rho2 = drho_i*film_modulation
+rho2 = drho_i#*film_modulation
 
 Z[mask1] += 1+r1+2*np.sqrt(r1)*np.cos(rho1-k*(L[mask1]+2*dz))
 Z[mask2] += 1+r2+2*np.sqrt(r2)*np.cos(rho2-k*(L[mask2]+2*dz))
