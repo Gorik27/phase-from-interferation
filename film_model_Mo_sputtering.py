@@ -152,7 +152,7 @@ match scale:
         units = 'м'
         
 r1, rho1 = r_rho(N_film, 0, lmb, n_air, N_sub)
-rho_calc = np.zeros(rho_ex.shape)    
+rho_calc = np.zeros(thickness.shape)    
 
 for i, tk in enumerate(thickness):
     if tk < tk0:
@@ -197,7 +197,7 @@ for i, tk in enumerate(thickness):
         plt.ylabel(f'[{units}]')
         plt.gca().set_aspect('equal')
         plt.colorbar()
-        plt.title('Развернутая разность фаз [рад/$\pi$]')
+        plt.title('Развернутая разность фаз [$\pi$ рад]')
         plt.gcf().tight_layout()
         plt.show()
     
@@ -207,21 +207,20 @@ rho_calc_ = np.unwrap(rho_calc)
 kk = round((rho_calc_.mean()-rho_plt_.mean())/(2*np.pi))
 rho_calc_ -= 2*kk*np.pi
 
+color = 'black'
+color_deriv = 'blue'
+
 plt.figure(dpi=500)
-#plt.plot(thickness_plt*1e9-tk0*1e9, rho_plt/(np.pi), label='Рассчет')
-plt.plot(thickness*1e9-tk0*1e9, np.unwrap(rho_calc)/(np.pi), '.', color='black', label='Измерение')
-plt.legend()
+plt.plot(thickness*1e9-tk0*1e9, np.unwrap(rho_calc)[::-1]/(np.pi), color=color)
+plt.plot(thickness*1e9-tk0*1e9, np.unwrap(rho_calc)[::-1]/(np.pi), '.', color=color)
 plt.xlabel('Время')
-plt.ylabel('Разность фаз [$\pi$ рад]')
-plt.show()
-
-#%%
+plt.ylabel('Разность фаз [$\pi$ рад]', color=color)
+plt.xticks([])
 deriv = np.diff(rho_calc_)/(np.pi)/np.diff(thickness)*1e-9
-
-plt.figure(dpi=500)
-plt.plot(thickness[:-1]*1e9-tk0*1e9, deriv , '.', color='black', label='Измерение')
-plt.legend()
-plt.xlabel('Время [a.u.]')
-plt.ylabel('производная разности фаз [$\pi$ рад / a.u.]')
-#plt.ylim((-0.06, 0.06))
+plt.twinx()
+plt.plot((thickness[1:]+thickness[:-1])/2*1e9-tk0*1e9, deriv[::-1], color=color_deriv)
+plt.plot((thickness[1:]+thickness[:-1])/2*1e9-tk0*1e9, deriv[::-1], '.', color=color_deriv)
+plt.ylabel('Производная разности фаз', color=color_deriv)
+plt.yticks([])
+plt.xticks([])
 plt.show()

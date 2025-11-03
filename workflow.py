@@ -140,7 +140,7 @@ plt.xlabel(f'[{units}]')
 plt.ylabel(f'[{units}]')
 plt.gca().set_aspect('equal')
 plt.colorbar()
-plt.title('Развернутая разность фаз [рад/$\pi$]')
+plt.title('Развернутая разность фаз [$\pi$ рад]')
 
 dphi_m = np.ma.median(dphi_u[mask1])-np.ma.median(dphi_u[mask2])
 dphi_m *= -1

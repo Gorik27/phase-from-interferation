@@ -277,8 +277,8 @@ def process(x, y, Z,
         plt.gca().set_aspect('equal')
         plt.colorbar()
         match language:
-            case 'en': title = 'Unwrapped phase [rad/$\pi$]'
-            case 'ru': title = 'Развернутая фаза [рад/$\pi$]'
+            case 'en': title = 'Unwrapped phase [$\pi$ rad]'
+            case 'ru': title = 'Развернутая фаза [$\pi$ рад]'
         plt.title(title)
         plt.gcf().tight_layout()
         plt.show()

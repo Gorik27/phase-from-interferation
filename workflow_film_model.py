@@ -203,7 +203,7 @@ for i, tk in enumerate(thickness):
         plt.ylabel(f'[{units}]')
         plt.gca().set_aspect('equal')
         plt.colorbar()
-        plt.title('Развернутая разность фаз [рад/$\pi$]')
+        plt.title('Развернутая разность фаз [$\pi$ рад]')
         plt.gcf().tight_layout()
         plt.show()
     

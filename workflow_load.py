@@ -84,7 +84,7 @@ plt.subplot(121)
 plt.contourf(x, y, plt_dphi_u)
 plt.gca().set_aspect('equal')
 plt.colorbar()
-plt.title('Unwrapped phase  difference [rad/$\pi$]')
+plt.title('Unwrapped phase  difference [$\pi$ рад]')
 
 plt.subplot(122)
 plt.contourf(x, y, S)
