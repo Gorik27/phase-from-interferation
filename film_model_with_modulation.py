@@ -8,7 +8,9 @@ from processing import process
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
-
+from copy import deepcopy as dc
+from matplotlib.ticker import FuncFormatter
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 remove_spikes = 0 #turn on stupid algorithm to remove spikes from final picture (sometimes may not work because it is stupid)
 use_equal_windows = 1 # make a window a second time equal to the first
@@ -53,17 +55,19 @@ def r_rho(n, l, lmb, nv, ns):
 Material parameters
 """
 lmb = 670*1e-9 #nm
-relative_modulation = 0.05
+relative_modulation = 0.5
 k = 2*np.pi/lmb
+scale = 1000 #mm
+
 
 #B
 n_film = 3.25
 k_film = 0.3
 N_film = n_film - 1j*k_film
 
-thickness_plt = np.linspace(0, 55, 1000)*1e-9
+thickness_plt = np.linspace(0, 200, 1000)*1e-9
 #thickness_plt = np.concatenate(([0], thickness_plt))
-thickness = 40e-9
+thickness =90e-9
 
 n_air = 1
 
@@ -112,7 +116,7 @@ thickness = thickness*film_modulation
 plt.figure(figsize=(10, 5), dpi=500)
 plt.subplot(121)
 z_plt = np.ma.array(thickness*1e9, mask=~mask2)
-plt.contourf(x, y, z_plt)
+plt.contourf(x*scale, y*scale, z_plt)
 plt.colorbar()
 plt.title('Толщина пленки [нм]')
 plt.xlabel('[мм]')
@@ -135,20 +139,56 @@ plt.show()
 
 
 #%%
-istart = np.argmin(rho_plt_u)
-istop = np.argmax(rho_plt_u)
-ydata = thickness_plt[istart:istop]
-xdata = rho_plt_u[istart:istop]
-inverse_function = interp1d(xdata, ydata, fill_value=0, bounds_error=False)
+_i1 = np.argmin(rho_plt_u)
+_i2 = np.argmax(rho_plt_u)
+i1, i2 = min(_i1, _i2), max(_i1, _i2)
+ydata = thickness_plt[i1:i2]
+xdata = rho_plt_u[i1:i2]
+xbounds = [xdata.min(), xdata.max()]
+if np.ptp(xbounds) > (2*np.pi):
+    print('WARNING: cannot solve inverse problem for phase interval more than 2pi\nI will narrow the interval')
+    new_xmax = xbounds[0]+2*np.pi
+    i0 = np.where((xdata-new_xmax)[1:]*(xdata-new_xmax)[:-1]<0)[0][0]
+    if abs(xdata[0]-xdata[i0]) > abs(xdata[-1]-xdata[i0]):
+        i2 = i1+i0-1
+    else:
+        i1 = i1+i0+1
+    ydata = thickness_plt[i1:i2]
+    xdata = rho_plt_u[i1:i2]
+    xbounds = [xdata.min(), xdata.max()]
+"""
+Проблема с fill_value
+"""
+_inverse_function = interp1d(xdata, ydata)#, fill_value=np.nan, bounds_error=False)
+def in_bounds(x):
+    return np.logical_and((x>=xbounds[0]),(x<=xbounds[1]))
+
+xdata_wrap = np.mod(xdata, 2*np.pi)
+xdata_shift = xdata - xdata_wrap
+ids = np.argsort(xdata_wrap)
+xdata_wrap = xdata_wrap[ids]
+xdata_shift = xdata_shift[ids]
+kink = np.diff(xdata_shift)
+shts = np.where(kink!=0)[0]
+assert len(shts) == 1
+i0 = shts[0]+1
+x0_wrap = xdata_wrap[i0]
+shift = xdata_shift[i0]
+
+def inverse_function(xs):
+    xs = dc(xs)
+    xs = np.mod(xs, 2*np.pi) #wrapped
+    xs[xs>=x0_wrap] += shift
+    return _inverse_function(xs)
+
 plt.plot(xdata, ydata*1e9, '.', color='black', label='data')
 xdatas = np.linspace(xdata.min(), xdata.max())
-plt.plot(xdatas, inverse_function(xdatas)*1e9, color='blue', label='interpolation')
+ys = inverse_function(xdatas)
+plt.plot(xdatas, ys*1e9, color='blue', label='interpolation')
 plt.title('Interpolation of inverse function')
 plt.legend()
 plt.show()
 #%%
-scale = 1000 #mm
-
 theta = 1*1e-3 #mrads - angle between interfering rays
 psi = np.pi*(1/4+1/8) # The angle between the plum of the fall of light and the axis x
 
@@ -230,11 +270,13 @@ rho_calc = np.mod(dphi_m, 2*np.pi)#dphi_m
 print(f'Median phase difference 2pi modulo: {rho_calc}')
 
 #%%
-remove_spikes = 1
+remove_spikes = 0
 
 if remove_spikes:
-    va, vb = np.ma.median(dphi_u[mask1]), np.ma.median(dphi_u[mask2])
-    v1, v2 = min(va, vb)-3, max(va, vb)+3
+    #va, vb = np.ma.median(dphi_u[mask1]), np.ma.median(dphi_u[mask2])
+    #v1, v2 = min(va, vb)-3, max(va, vb)+3
+    v1 = np.quantile(dphi_u.compressed(), 0.001)
+    v2 = np.quantile(dphi_u.compressed(), 0.999)
     pltmask = (dphi_u < v1) + (dphi_u > v2)
     plt_dphi_u = np.ma.array(dphi_u, mask=pltmask)
 else:
@@ -242,7 +284,7 @@ else:
 
 plt.figure(dpi=500)
 plt_dphi = np.mod(plt_dphi_u, 2*np.pi)
-plt.contourf(x, y, plt_dphi/np.pi)
+plt.contourf(x*scale, y*scale, plt_dphi/np.pi)
 plt.xlabel(f'[{units}]')
 plt.ylabel(f'[{units}]')
 plt.gca().set_aspect('equal')
@@ -265,27 +307,62 @@ plt.xlabel('Толщина пленки бора [нм]')
 plt.ylabel('Разность фаз [$\pi$ рад]')
 plt.show()
 #%%
+def formatter(x, pos):
+    return f"{x:,.0f}"
+
 tks = inverse_function(plt_dphi.filled(0))*1e9
 if remove_spikes:
     tks = np.ma.array(tks, mask=pltmask+(~mask2))
 else:
     tks = np.ma.array(tks, mask=~(mask2))
+    
+vmin, vmax = min(tks.min(), z_plt.min()), max(tks.max(), z_plt.max())    
+levels = np.linspace(vmin, vmax, 20)
 
 plt.figure(figsize=(10, 5), dpi=500)
 plt.subplot(121)
-plt.contourf(x, y, z_plt)
-plt.colorbar()
-plt.title('Толщина пленки [нм]')
+ax1 = plt.gca()
+cnt1 = plt.contourf(x*scale, y*scale, z_plt, levels=levels)
+#plt.colorbar()
+plt.title('Синтезированный профиль пленки [нм]')
 plt.xlabel(f'[{units}]')
 plt.ylabel(f'[{units}]')
 plt.gca().set_aspect('equal')
 plt.subplot(122)
-plt.contourf(x, y, tks)
+ax2 = plt.gca()
+cnt2 = plt.contourf(x*scale, y*scale, tks, levels=levels)
 plt.xlabel(f'[{units}]')
 plt.ylabel(f'[{units}]')
 plt.gca().set_aspect('equal')
-plt.colorbar()
-plt.title('Измеренная толщина [нм]')
+#plt.colorbar()
+plt.title('Измеренный профиль пленки [нм]')
+# Create space for colorbar on BOTH axes to keep them equal size
+divider1 = make_axes_locatable(ax1)
+divider2 = make_axes_locatable(ax2)
+
+# Add empty space to ax1 (invisible colorbar)
+cax1 = divider1.append_axes("right", size="5%", pad=0.1)
+cax1.remove()  # Remove the empty axes
+
+# Add actual colorbar to ax2
+cax2 = divider2.append_axes("right", size="5%", pad=0.1)
+cbar = plt.gcf().colorbar(cnt2, cax=cax2)
+cbar.ax.yaxis.set_major_formatter(FuncFormatter(formatter))
 plt.gcf().tight_layout()
 plt.show()
+
+#%%
+from matplotlib.cm import ScalarMappable
+fig, ax = plt.subplots()
+plt.title('Относительная ошибка [Lg]')
+plt.xlabel(f'[{units}]')
+plt.ylabel(f'[{units}]')
+plt.gca().set_aspect('equal')
+err = np.abs((z_plt-tks)/z_plt)
+logerr = np.log10(err)
+levels = np.linspace(-3, 0, 10)
+qcs = plt.contourf(x*scale, y*scale, logerr, vmin=-2, vmax=0)#, levels=levels)
+cbar = fig.colorbar(ScalarMappable(norm=qcs.norm, cmap=qcs.cmap), ax=ax, ticks=[-2, -1, 0])
+#cbar.ax.yaxis.set_ticks()
+print(f'Median relative error: {np.ma.median(err)*100}%')
 

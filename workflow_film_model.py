@@ -9,14 +9,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-plot_delta_rho = 1 # turn on plotting phase map
+plot_delta_rho = 1# turn on plotting phase map
 remove_spikes = 1 #turn on stupid algorithm to remove spikes from final picture (sometimes may not work because it is stupid)
 use_equal_windows = 1 # make a window a second time equal to the first
 
 processing_settings = { #The accuracy of the result greatly depends on the following parameters of processing and discharge +1 peak
 'scale' : 1000,
 'language': 'ru',
-'plot': 1,
+'plot': 0,
 'verbose': False,
 'mask_coef' : 0.75,     # The level of which is determined by peaks (all that is higher than mask_coef*maximum value)
 'window_coef' : 10,     # How much the window width is greater than the peak width of the mask_coef level 
@@ -192,7 +192,7 @@ for i, tk in enumerate(thickness):
     if plot_delta_rho:
         if remove_spikes:
             va, vb = np.ma.median(dphi_u[mask1]), np.ma.median(dphi_u[mask2])
-            v1, v2 = min(va, vb)-1, max(va, vb)+1
+            v1, v2 = min(va, vb)-3, max(va, vb)+3
             pltmask = (dphi_u < v1) + (dphi_u > v2)
             plt_dphi_u = np.ma.array(dphi_u, mask=pltmask)
         else:
@@ -215,7 +215,7 @@ rho_calc_ = np.unwrap(rho_calc)
 kk = round((rho_calc_.mean()-rho_plt_.mean())/(2*np.pi))
 rho_calc_ -= 2*kk*np.pi
 
-plt.plot(thickness_plt*1e9, rho_plt_/(np.pi), label='Рассчет')
+plt.plot(thickness_plt*1e9, rho_plt_/(np.pi), label='Расчет')
 plt.plot(thickness*1e9, rho_calc_/(np.pi), '.', color='black', label='Измерение')
 plt.legend()
 plt.xlabel('Толщина пленки бора [нм]')
